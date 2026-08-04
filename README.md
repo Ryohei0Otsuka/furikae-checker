@@ -13,6 +13,7 @@ https://ryohei0otsuka.github.io/furikae-checker/
 ## Features
 
 * 月ごとの日付と曜日を自動生成
+* 日本の祝日を休日として表示
 * 振替出勤と振替休日のペア設定
 * 未設定や件数不一致のチェック
 * 対応する日付からメモを生成
@@ -34,6 +35,7 @@ https://ryohei0otsuka.github.io/furikae-checker/
 * Vite
 * CSS
 * localStorage
+* @holiday-jp/holiday_jp
 
 ## Setup
 
