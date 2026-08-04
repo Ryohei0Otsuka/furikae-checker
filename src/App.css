@@ -93,6 +93,18 @@ section h2 {
   line-height: 1.6;
 }
 
+.holiday-data-note {
+  display: inline-flex;
+  margin: 10px 0 0;
+  padding: 6px 10px;
+  border: 1px solid var(--holiday-border);
+  border-radius: 999px;
+  background: var(--holiday-soft);
+  color: var(--holiday-text);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .control-actions {
   display: flex;
   align-items: flex-end;
@@ -352,7 +364,7 @@ thead th {
 }
 
 tbody th {
-  width: 145px;
+  width: 175px;
   color: var(--text);
   font-size: 0.9rem;
 }
@@ -368,6 +380,10 @@ tbody tr:hover {
 
 .weekend-row {
   background: var(--weekend-bg);
+}
+
+.holiday-row {
+  background: var(--holiday-row);
 }
 
 .unpaired-row {
@@ -393,6 +409,20 @@ tbody tr:hover {
 .weekend-row .weekday {
   background: var(--weekend-chip);
   color: var(--weekend-text);
+}
+
+.holiday-row .weekday {
+  background: var(--holiday-chip);
+  color: var(--holiday-text);
+}
+
+.holiday-name {
+  display: block;
+  margin-top: 5px;
+  color: var(--holiday-text);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 table select {

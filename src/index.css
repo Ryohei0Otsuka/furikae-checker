@@ -49,9 +49,16 @@
   --danger-text: #ffffff;
 
   --chip-bg: #edf1f3;
+
   --weekend-bg: #fbf7f2;
   --weekend-chip: #f2e3d3;
   --weekend-text: #85592f;
+
+  --holiday-row: #fff8f8;
+  --holiday-soft: #fff0f1;
+  --holiday-chip: #f7dfe2;
+  --holiday-border: #efc7cc;
+  --holiday-text: #a13e49;
 }
 
 * {
@@ -123,8 +130,15 @@ select:focus-visible {
     --danger-text: #3c080d;
 
     --chip-bg: #26333b;
+
     --weekend-bg: #211d1a;
     --weekend-chip: #49382a;
     --weekend-text: #ebbd8e;
+
+    --holiday-row: #271b1e;
+    --holiday-soft: #402126;
+    --holiday-chip: #563038;
+    --holiday-border: #74404a;
+    --holiday-text: #f2a4ad;
   }
 }

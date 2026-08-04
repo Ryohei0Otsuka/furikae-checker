@@ -1,4 +1,5 @@
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
+import * as holidayJp from '@holiday-jp/holiday_jp'
 import './App.css'
 
 type WorkType =
@@ -46,13 +47,46 @@ function getCurrentMonthValue(): string {
 function parseDate(dateText: string): Date {
   const [year, month, day] = dateText.split('-').map(Number)
 
-  return new Date(year, month - 1, day)
+  return new Date(year, month - 1, day, 12)
+}
+
+function toDateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
 }
 
 function isWeekend(dateText: string): boolean {
   const weekday = parseDate(dateText).getDay()
 
   return weekday === 0 || weekday === 6
+}
+
+function getJapaneseHolidayMap(
+  monthValue: string,
+): Map<string, string> {
+  const [year, month] = monthValue.split('-').map(Number)
+
+  const start = new Date(year, month - 1, 1, 0, 0, 0, 0)
+  const end = new Date(year, month, 0, 23, 59, 59, 999)
+
+  const holidays = holidayJp.between(start, end)
+
+  return new Map(
+    holidays.map((holiday) => [
+      toDateKey(holiday.date),
+      holiday.name,
+    ]),
+  )
+}
+
+function isCalendarHoliday(
+  dateText: string,
+  holidayMap: Map<string, string>,
+): boolean {
+  return isWeekend(dateText) || holidayMap.has(dateText)
 }
 
 function formatDate(
@@ -67,7 +101,10 @@ function formatDate(
     : base
 }
 
-function createMonthDays(monthValue: string): WorkDay[] {
+function createMonthDays(
+  monthValue: string,
+  holidayMap = getJapaneseHolidayMap(monthValue),
+): WorkDay[] {
   const [year, month] = monthValue.split('-').map(Number)
   const lastDay = new Date(year, month, 0).getDate()
 
@@ -81,7 +118,7 @@ function createMonthDays(monthValue: string): WorkDay[] {
 
     return {
       date,
-      workType: isWeekend(date)
+      workType: isCalendarHoliday(date, holidayMap)
         ? 'holiday'
         : 'normalWork',
       pairedDate: null,
@@ -95,8 +132,11 @@ function isWorkType(value: unknown): value is WorkType {
   )
 }
 
-function loadMonth(monthValue: string): WorkDay[] {
-  const defaults = createMonthDays(monthValue)
+function loadMonth(
+  monthValue: string,
+  holidayMap = getJapaneseHolidayMap(monthValue),
+): WorkDay[] {
+  const defaults = createMonthDays(monthValue, holidayMap)
 
   const saved = localStorage.getItem(
     `${STORAGE_PREFIX}${monthValue}`,
@@ -126,13 +166,24 @@ function loadMonth(monthValue: string): WorkDay[] {
           ? savedDay.pairedDate
           : null
 
+      const savedWorkType = isWorkType(savedDay?.workType)
+        ? savedDay.workType
+        : defaultDay.workType
+
+      /*
+       * 祝日対応前に自動保存された「通常出勤」は、
+       * 祝日追加後には「休日」へ移行する。
+       * 振替出勤など、ユーザーが明示した区分は維持する。
+       */
+      const workType =
+        defaultDay.workType === 'holiday' &&
+        savedWorkType === 'normalWork'
+          ? 'holiday'
+          : savedWorkType
+
       return {
         ...defaultDay,
-
-        workType: isWorkType(savedDay?.workType)
-          ? savedDay.workType
-          : defaultDay.workType,
-
+        workType,
         pairedDate,
       }
     })
@@ -186,15 +237,21 @@ async function copyToClipboard(
 }
 
 function App() {
-  const [selectedMonth, setSelectedMonth] = useState(
-    getCurrentMonthValue,
-  )
+  const initialMonth = getCurrentMonthValue()
+
+  const [selectedMonth, setSelectedMonth] =
+    useState(initialMonth)
 
   const [days, setDays] = useState<WorkDay[]>(() =>
-    loadMonth(getCurrentMonthValue()),
+    loadMonth(initialMonth),
   )
 
   const [copyMessage, setCopyMessage] = useState('')
+
+  const holidayMap = useMemo(
+    () => getJapaneseHolidayMap(selectedMonth),
+    [selectedMonth],
+  )
 
   useEffect(() => {
     localStorage.setItem(
@@ -243,14 +300,19 @@ function App() {
 
     days.forEach((day) => {
       if (day.workType === 'substituteWork') {
-        if (!isWeekend(day.date)) {
+        if (
+          !isCalendarHoliday(
+            day.date,
+            holidayMap,
+          )
+        ) {
           items.push({
             id: `${day.date}-work-weekday`,
             level: 'warning',
 
             message:
               `${formatDate(day.date)}が` +
-              '振替出勤ですが、土日ではありません。',
+              '振替出勤ですが、土日・祝日ではありません。',
           })
         }
 
@@ -287,14 +349,19 @@ function App() {
       if (
         day.workType === 'substituteHoliday'
       ) {
-        if (isWeekend(day.date)) {
+        if (
+          isCalendarHoliday(
+            day.date,
+            holidayMap,
+          )
+        ) {
           items.push({
-            id: `${day.date}-holiday-weekend`,
+            id: `${day.date}-holiday-dayoff`,
             level: 'warning',
 
             message:
               `${formatDate(day.date)}が` +
-              '振替休日ですが、土日です。',
+              '振替休日ですが、土日・祝日です。',
           })
         }
 
@@ -314,6 +381,7 @@ function App() {
     return items
   }, [
     days,
+    holidayMap,
     substituteHolidayCount,
     substituteWorkCount,
   ])
@@ -321,8 +389,11 @@ function App() {
   const handleMonthChange = (
     monthValue: string,
   ) => {
+    const nextHolidayMap =
+      getJapaneseHolidayMap(monthValue)
+
     setSelectedMonth(monthValue)
-    setDays(loadMonth(monthValue))
+    setDays(loadMonth(monthValue, nextHolidayMap))
     setCopyMessage('')
   }
 
@@ -552,7 +623,13 @@ function App() {
       `${STORAGE_PREFIX}${selectedMonth}`,
     )
 
-    setDays(createMonthDays(selectedMonth))
+    setDays(
+      createMonthDays(
+        selectedMonth,
+        holidayMap,
+      ),
+    )
+
     setCopyMessage('入力内容を初期化しました。')
   }
 
@@ -567,9 +644,9 @@ function App() {
           <h1>振替勤務チェッカー</h1>
 
           <p className="hero-description">
-            土日の振替出勤と平日の振替休日を
-            対応付け、勤務報告書の備考文を
-            作成します。
+            土日・祝日の振替出勤と平日の
+            振替休日を対応付け、勤務報告書の
+            備考文を作成します。
           </p>
         </div>
 
@@ -591,6 +668,11 @@ function App() {
             <p className="section-help">
               月を選び、勤務区分を変更して
               振替日をペアにしてください。
+            </p>
+
+            <p className="holiday-data-note">
+              日本の祝日を自動反映：
+              {holidayMap.size}日
             </p>
           </div>
 
@@ -737,8 +819,8 @@ function App() {
               </h2>
 
               <p className="section-help">
-                先に「振替出勤」「振替休日」を
-                設定し、その後に対応日を選びます。
+                土日と日本の祝日は、休日として
+                初期表示されます。
               </p>
             </div>
 
@@ -804,6 +886,9 @@ function App() {
                     day.workType ===
                       'substituteHoliday'
 
+                  const holidayName =
+                    holidayMap.get(day.date)
+
                   return (
                     <tr
                       key={day.date}
@@ -811,6 +896,10 @@ function App() {
                         `${
                           isWeekend(day.date)
                             ? 'weekend-row'
+                            : ''
+                        } ${
+                          holidayName
+                            ? 'holiday-row'
                             : ''
                         } ${
                           needsPair &&
@@ -837,6 +926,12 @@ function App() {
                             ]
                           }
                         </span>
+
+                        {holidayName && (
+                          <span className="holiday-name">
+                            {holidayName}
+                          </span>
+                        )}
                       </th>
 
                       <td>
